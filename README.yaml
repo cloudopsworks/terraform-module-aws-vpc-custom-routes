@@ -1,4 +1,4 @@
-name: Terraform Transit Gateway Module
+name: Terraform VPC Routing Tables Custom Routes Management Module
 #logo: logo/logo.jpg
 
 license: "APACHE2"
@@ -8,23 +8,93 @@ copyrights:
     url: "https://cloudops.works"
     year: "2024"
 
-github_repo: cloudopsworks/terraform-module-aws-vpc-setup
+github_repo: cloudopsworks/terraform-module-aws-vpc-custom-routes
 
 description: |-
-  VPC Module for setting up transit gateway with ResourceAccessMananger support.
+  AWS VPC Custom Routes Management Module for Terraform that allows dynamic configuration of routing tables
+  with support for multiple route types including NAT Gateway, Transit Gateway, VPC Peering, Network Interfaces,
+  VPC Endpoints, and Egress-only Internet Gateways.
 
 # Introduction to the project
-#introduction: |-
-#  This is an introduction.
+introduction: |-
+  This Terraform module manages custom routes in AWS VPC routing tables. It provides a flexible way to define
+  multiple routes with different target types in a single routing table. The module supports automatic
+  routing table discovery through subnet association or direct routing table ID specification.
 
 # How to use this project
-#usage: |-
+usage: |-
+  Module supports the following route target types:
+  - nat_gateway_id: Route traffic through a NAT Gateway
+  - transit_gateway_id: Route traffic through a Transit Gateway
+  - vpc_peering_connection_id: Route traffic through a VPC Peering Connection
+  - egress_only_internet_gateway_id: Route traffic through an Egress-only Internet Gateway
+  - network_interface_id: Route traffic through a Network Interface
+  - vpc_endpoint_id: Route traffic through a VPC Endpoint
+
+  Variable configuration:
+    subnet_id: (Optional) Subnet ID for automatic routing table discovery
+    routing_table_id: (Optional) Direct routing table ID specification
+    routes: List of route configurations with the following structure:
+      - cidr_block: Destination CIDR block
+      - nat_gateway_id: (Optional) NAT Gateway ID
+      - transit_gateway_id: (Optional) Transit Gateway ID
+      - vpc_peering_connection_id: (Optional) VPC Peering Connection ID
+      - egress_only_internet_gateway_id: (Optional) Egress-only Internet Gateway ID
+      - network_interface_id: (Optional) Network Interface ID
+      - vpc_endpoint_id: (Optional) VPC Endpoint ID
 
 # Example usage
-#examples: |-
+examples: |-
+  terraform:
+    source: "cloudopsworks/vpc-custom-routes/aws"
+    version: "1.0.0"
+    inputs:
+      subnet_id: "subnet-12345678"
+      routes:
+        - cidr_block: "10.0.0.0/16"
+          nat_gateway_id: "nat-12345678"
+        - cidr_block: "172.16.0.0/12"
+          transit_gateway_id: "tgw-12345678"
+
+  terragrunt:
+    terraform:
+      source: "cloudopsworks/vpc-custom-routes/aws"
+
+    inputs:
+      routing_table_id: "rtb-12345678"
+      routes:
+        - cidr_block: "192.168.0.0/16"
+          vpc_peering_connection_id: "pcx-12345678"
+        - cidr_block: "fd00::/8"
+          egress_only_internet_gateway_id: "eigw-12345678"
 
 # How to get started quickly
-#quickstart: |-
+quickstart: |-
+  1. Add the module to your Terraform configuration:
+     ```hcl
+     module "vpc_routes" {
+       source  = "cloudopsworks/vpc-custom-routes/aws"
+       version = "1.0.0"
+
+       subnet_id = "subnet-12345678"
+       routes = [
+         {
+           cidr_block = "10.0.0.0/16"
+           nat_gateway_id = "nat-12345678"
+         }
+       ]
+     }
+     ```
+
+  2. Initialize Terraform:
+     ```bash
+     terraform init
+     ```
+
+  3. Apply the configuration:
+     ```bash
+     terraform apply
+     ```
 
 include:
   - "docs/targets.md"
