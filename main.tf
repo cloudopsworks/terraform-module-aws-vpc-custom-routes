@@ -36,7 +36,6 @@ locals {
       }
     }
   ]
-  route_mappings = merge(local.route_mappings_by_subnet, local.route_mappings_by_route_table)
 }
 
 data "aws_route_table" "from_subnets" {
@@ -50,7 +49,7 @@ data "aws_route_table" "from_route_tables" {
 }
 
 resource "aws_route" "this" {
-  for_each                  = local.route_mappings
+  for_each                  = length(var.subnet_ids) > 0 ? local.route_mappings_by_subnet : local.route_mappings_by_route_table
   route_table_id            = each.value.route_table_id
   destination_cidr_block    = each.value.cidr_block
   nat_gateway_id            = each.value.nat_gateway_id
