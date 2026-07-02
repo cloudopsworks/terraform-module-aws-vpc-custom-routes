@@ -103,7 +103,7 @@ During scaffolding you will be prompted for the VPC dependency settings:
 | `vpc_dependency_enabled` | `true` | Wire `subnet_ids`/`routing_table_ids` from a Terragrunt `dependency "vpc"` block |
 | `vpc_dependency_path` | `../vpc` | Relative path to the VPC deployment |
 | `vpc_dependency_network_type` | `private` | Which network tier to target: `private`, `public`, `database`, `intra`, `both` (intra+private), `three` (intra+private+database) |
-| `vpc_dependency_route_tables_from` | `route_tables` | Feed the module from VPC `route_tables` outputs or from `subnet` outputs |
+| `vpc_dependency_route_tables_from` | `route_tables` | Feed the module from VPC `route_tables` outputs or from `subnets` outputs |
 
 The generated `inputs.yaml` contains all module-specific variables:
 
@@ -319,7 +319,7 @@ Available targets:
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.35 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.53.0 |
 
 ## Modules
 

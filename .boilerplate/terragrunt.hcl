@@ -23,10 +23,6 @@ locals {
 include "root" {
   path = find_in_parent_folders("{{ .RootFileName }}")
 }
-
-terraform {
-  source = "{{ .sourceUrl }}"
-}
 {{ if .vpc_dependency_enabled }}
 dependency "vpc" {
   config_path = "{{ .vpc_dependency_path }}"
@@ -76,6 +72,10 @@ dependency "vpc" {
   }
 }
 {{ end }}
+terraform {
+  source = "{{ .sourceUrl }}"
+}
+
 inputs = {
   is_hub     = {{ .is_hub }}
   org        = local.env_vars.org
@@ -88,7 +88,7 @@ inputs = {
   {{- range .optionalVariables }}
   {{- if not (eq .Name "extra_tags" "is_hub" "spoke_def" "org") }}
   {{- if and $.vpc_dependency_enabled (eq .Name "routing_table_ids" "subnet_ids") }}
-  {{- if eq $.vpc_dependency_route_tables_from "route_tables" }}
+  {{- if and (eq $.vpc_dependency_route_tables_from "route_tables") (eq .Name "routing_table_ids") }}
   {{- if eq $.vpc_dependency_network_type "both" }}
   routing_table_ids = concat(dependency.vpc.outputs.private_route_table_ids, dependency.vpc.outputs.intra_route_table_ids)
   {{- else if eq $.vpc_dependency_network_type "three" }}
@@ -96,7 +96,7 @@ inputs = {
   {{- else }}
   routing_table_ids = dependency.vpc.outputs.{{ $.vpc_dependency_network_type }}_route_table_ids
   {{- end }}
-  {{- else }}
+  {{- else if and (eq $.vpc_dependency_route_tables_from "subnets") (eq .Name "subnet_ids") }}
   {{- if eq $.vpc_dependency_network_type "both" }}
   subnet_ids = concat(dependency.vpc.outputs.private_subnets, dependency.vpc.outputs.intra_subnets)
   {{- else if eq $.vpc_dependency_network_type "three" }}
