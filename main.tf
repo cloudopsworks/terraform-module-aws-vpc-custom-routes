@@ -50,7 +50,7 @@ data "aws_route_table" "from_subnets" {
 resource "aws_route" "this" {
   for_each                  = local.route_mappings
   route_table_id            = each.value.route_table_id
-  destination_cidr_block    = each.value.cidr_block
+  destination_cidr_block    = each.value.destination_cidr_block
   nat_gateway_id            = each.value.nat_gateway_id
   transit_gateway_id        = each.value.transit_gateway_id
   vpc_peering_connection_id = each.value.vpc_peering_connection_id
