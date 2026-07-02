@@ -7,15 +7,15 @@
 #     Distributed Under Apache v2.0 License
 #
 
-variable "subnet_id" {
+variable "subnet_ids" {
   description = "The ID of the subnet to which the NAT gateway will be associated. Required if routing_table_id is not provided."
-  type        = string
-  default     = ""
+  type        = list(string)
+  default     = []
 }
-variable "routing_table_id" {
+variable "routing_table_ids" {
   description = "The ID of the routing table to which the NAT gateway will be associated. Required if subnet_id is not provided."
-  type        = string
-  default     = ""
+  type        = list(string)
+  default     = []
 }
 
 variable "routes" {
