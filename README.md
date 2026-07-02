@@ -12,12 +12,12 @@
 
 # Terraform VPC Routing Tables Custom Routes Management Module
 
-
+ [![Latest Release](https://img.shields.io/github/release/cloudopsworks/terraform-module-aws-vpc-custom-routes.svg?style=for-the-badge)](https://github.com/cloudopsworks/terraform-module-aws-vpc-custom-routes/releases/latest) [![Last Updated](https://img.shields.io/github/last-commit/cloudopsworks/terraform-module-aws-vpc-custom-routes.svg?style=for-the-badge)](https://github.com/cloudopsworks/terraform-module-aws-vpc-custom-routes/commits)
 
 
 AWS VPC Custom Routes Management Module for Terraform that allows dynamic configuration of routing tables
-with support for multiple route types including NAT Gateway, Transit Gateway, VPC Peering, Network Interfaces,
-VPC Endpoints, and Egress-only Internet Gateways.
+with support for multiple route types including NAT Gateway, Transit Gateway, VPC Peering Connections,
+Network Interfaces, VPC Endpoints, and Egress-only Internet Gateways.
 
 
 ---
@@ -47,9 +47,27 @@ We have [*lots of terraform modules*][terraform_modules] that are Open Source an
 
 ## Introduction
 
-This Terraform module manages custom routes in AWS VPC routing tables. It provides a flexible way to define
-multiple routes with different target types in a single routing table. The module supports automatic
-routing table discovery through subnet association or direct routing table ID specification.
+This Terraform module manages custom routes in AWS VPC route tables. It provides a flexible way to inject
+the same set of routes into one or more route tables, resolved in either of two ways:
+
+- **By subnet** (`subnet_ids`): the module discovers the route table associated with each subnet
+  automatically through the `aws_route_table` data source.
+- **By route table** (`routing_table_ids`): route table IDs are targeted directly, no discovery is performed.
+
+Both lookup methods can be combined in a single deployment. Every route defined in `routes` is added to
+every resolved route table, keyed by `route_table_id` + `cidr_block`, so route sets stay consistent across
+all private/intra/database route tables of a VPC.
+
+Supported route targets (exactly one per route entry):
+
+| Target attribute | Routes traffic through |
+|------------------|------------------------|
+| `nat_gateway_id` | NAT Gateway |
+| `transit_gateway_id` | Transit Gateway |
+| `vpc_peering_connection_id` | VPC Peering Connection |
+| `egress_only_internet_gateway_id` | Egress-only Internet Gateway (IPv6 only) |
+| `network_interface_id` | Network Interface (ENI) |
+| `vpc_endpoint_id` | Gateway Load Balancer VPC Endpoint |
 
 ## Usage
 
@@ -58,79 +76,223 @@ routing table discovery through subnet association or direct routing table ID sp
 Instead pin to the release tag (e.g. `?ref=vX.Y.Z`) of one of our [latest releases](https://github.com/cloudopsworks/terraform-module-aws-vpc-custom-routes/releases).
 
 
-Module supports the following route target types:
-- nat_gateway_id: Route traffic through a NAT Gateway
-- transit_gateway_id: Route traffic through a Transit Gateway
-- vpc_peering_connection_id: Route traffic through a VPC Peering Connection
-- egress_only_internet_gateway_id: Route traffic through an Egress-only Internet Gateway
-- network_interface_id: Route traffic through a Network Interface
-- vpc_endpoint_id: Route traffic through a VPC Endpoint
+This module is intended to be deployed with Terragrunt using the CloudOps Works hierarchy
+(`global-inputs.yaml`, `env-inputs.yaml`, `region-inputs.yaml`, `spoke-inputs.yaml` plus their tag files).
+Bootstrap a new deployment with Terragrunt's built-in scaffold command:
 
-Variable configuration:
-  subnet_id: (Optional) Subnet ID for automatic routing table discovery
-  routing_table_id: (Optional) Direct routing table ID specification
-  routes: List of route configurations with the following structure:
-    - cidr_block: Destination CIDR block
-    - nat_gateway_id: (Optional) NAT Gateway ID
-    - transit_gateway_id: (Optional) Transit Gateway ID
-    - vpc_peering_connection_id: (Optional) VPC Peering Connection ID
-    - egress_only_internet_gateway_id: (Optional) Egress-only Internet Gateway ID
-    - network_interface_id: (Optional) Network Interface ID
-    - vpc_endpoint_id: (Optional) VPC Endpoint ID
+```sh
+# 1. Create and enter the target deployment directory
+mkdir -p <environment>/<region>/<spoke>/vpc-custom-routes
+cd <environment>/<region>/<spoke>/vpc-custom-routes
+
+# 2. Scaffold the module (do NOT use --working-dir)
+terragrunt scaffold github.com/cloudopsworks/terraform-module-aws-vpc-custom-routes
+
+# 3. Edit inputs.yaml with deployment-specific values
+#    (all keys and comments are pre-populated from .boilerplate/inputs.yaml)
+vi inputs.yaml
+
+# 4. Apply
+terragrunt apply
+```
+
+During scaffolding you will be prompted for the VPC dependency settings:
+
+| Prompt | Default | Purpose |
+|--------|---------|---------|
+| `vpc_dependency_enabled` | `true` | Wire `subnet_ids`/`routing_table_ids` from a Terragrunt `dependency "vpc"` block |
+| `vpc_dependency_path` | `../vpc` | Relative path to the VPC deployment |
+| `vpc_dependency_network_type` | `private` | Which network tier to target: `private`, `public`, `database`, `intra`, `both` (intra+private), `three` (intra+private+database) |
+| `vpc_dependency_route_tables_from` | `route_tables` | Feed the module from VPC `route_tables` outputs or from `subnet` outputs |
+
+The generated `inputs.yaml` contains all module-specific variables:
+
+```yaml
+# Module configuration
+# AWS VPC Custom Routes — per-deployment inputs loaded by terragrunt.hcl as local.local_vars.
+#
+# NOTE: When the VPC dependency is enabled at scaffold time, `subnet_ids` or
+# `routing_table_ids` are wired automatically in terragrunt.hcl from the VPC
+# dependency outputs. In that case do NOT set them here — only configure `routes`.
+
+# subnet_ids: # (Optional) List of subnet IDs whose associated route tables will receive the custom routes.
+#             # The route table for each subnet is discovered automatically.
+#             # Required if routing_table_ids is not provided. Default: []
+#   - "subnet-01234567890123456"
+
+# routing_table_ids: # (Optional) List of route table IDs that will receive the custom routes directly.
+#                    # Required if subnet_ids is not provided. Default: []
+#   - "rtb-01234567890123456"
+
+# routes: (Optional) List of custom routes added to EVERY resolved route table. Default: []
+# Each entry requires a destination cidr_block and exactly one target attribute.
+routes:
+  - cidr_block: "10.100.0.0/16"                              # (Required) Destination IPv4 or IPv6 CIDR block for the route.
+    transit_gateway_id: "tgw-0123456789abcdef0"              # (Optional) Transit Gateway ID target. Default: null
+  - cidr_block: "0.0.0.0/0"
+    nat_gateway_id: "nat-0123456789abcdef0"                  # (Optional) NAT Gateway ID target. Default: null
+#   - cidr_block: "192.168.0.0/16"
+#     vpc_peering_connection_id: "pcx-0123456789abcdef0"     # (Optional) VPC Peering Connection ID target. Default: null
+#   - cidr_block: "::/0"
+#     egress_only_internet_gateway_id: "eigw-0123456789abcdef0" # (Optional) Egress-only Internet Gateway ID target, IPv6 destinations only. Default: null
+#   - cidr_block: "10.200.0.0/24"
+#     network_interface_id: "eni-0123456789abcdef0"          # (Optional) Network Interface (ENI) ID target. Default: null
+#   - cidr_block: "10.201.0.0/24"
+#     vpc_endpoint_id: "vpce-0123456789abcdef0"              # (Optional) Gateway Load Balancer VPC Endpoint ID target. Default: null
+```
+
+The scaffold renders a `terragrunt.hcl` that loads `inputs.yaml` as `local.local_vars` and maps every
+variable into the `inputs` block. With the VPC dependency enabled (network type `private`, source
+`route_tables`) it looks like this:
+
+```hcl
+locals {
+  local_vars  = yamldecode(file("./inputs.yaml"))
+  spoke_vars  = yamldecode(file(find_in_parent_folders("spoke-inputs.yaml")))
+  region_vars = yamldecode(file(find_in_parent_folders("region-inputs.yaml")))
+  env_vars    = yamldecode(file(find_in_parent_folders("env-inputs.yaml")))
+  global_vars = yamldecode(file(find_in_parent_folders("global-inputs.yaml")))
+
+  local_tags  = jsondecode(file("./local-tags.json"))
+  spoke_tags  = jsondecode(file(find_in_parent_folders("spoke-tags.json")))
+  region_tags = jsondecode(file(find_in_parent_folders("region-tags.json")))
+  env_tags    = jsondecode(file(find_in_parent_folders("env-tags.json")))
+  global_tags = jsondecode(file(find_in_parent_folders("global-tags.json")))
+
+  tags = merge(
+    local.global_tags,
+    local.env_tags,
+    local.region_tags,
+    local.spoke_tags,
+    local.local_tags
+  )
+}
+
+include "root" {
+  path = find_in_parent_folders("root.hcl")
+}
+
+terraform {
+  source = "git::https://github.com/cloudopsworks/terraform-module-aws-vpc-custom-routes.git?ref=v1.0.6"
+}
+
+dependency "vpc" {
+  config_path = "../vpc"
+  # Mock outputs returned for `validate`/`destroy` when the VPC module
+  # has not been applied yet.
+  mock_outputs_allowed_terraform_commands = ["validate", "destroy"]
+  mock_outputs = {
+    vpc_name                 = "sample-vpc"
+    vpc_id                   = "vpc-12345678901234"
+    private_route_table_ids  = ["rtb-1234567890", "rtb-1234567891", "rtb-1234567892"]
+    public_route_table_ids   = ["rtb-1234567893", "rtb-1234567894"]
+    intra_route_table_ids    = ["rtb-1234567895", "rtb-1234567896", "rtb-1234567897"]
+    database_route_table_ids = ["rtb-1234567898", "rtb-1234567899"]
+    private_subnets          = ["subnet-01234567890123456", "subnet-01234567890123457", "subnet-01234567890123458"]
+    intra_subnets            = ["subnet-01234567890123456", "subnet-01234567890123457", "subnet-01234567890123458"]
+    public_subnets           = ["subnet-01234567890123456", "subnet-01234567890123457"]
+    database_subnets         = ["subnet-abcdef123456789", "subnet-abcdef123456781", "subnet-abcdef123456782"]
+  }
+}
+
+inputs = {
+  is_hub            = false
+  org               = local.env_vars.org
+  spoke_def         = local.spoke_vars.spoke
+  routing_table_ids = dependency.vpc.outputs.private_route_table_ids
+  routes            = try(local.local_vars.routes, [])
+  extra_tags        = local.tags
+}
+```
+
+With the VPC dependency disabled, `subnet_ids` and `routing_table_ids` are mapped from `inputs.yaml`
+instead:
+
+```hcl
+inputs = {
+  is_hub            = false
+  org               = local.env_vars.org
+  spoke_def         = local.spoke_vars.spoke
+  subnet_ids        = try(local.local_vars.subnet_ids, [])
+  routing_table_ids = try(local.local_vars.routing_table_ids, [])
+  routes            = try(local.local_vars.routes, [])
+  extra_tags        = local.tags
+}
+```
 
 ## Quick Start
 
-1. Add the module to your Terraform configuration:
-   ```hcl
-   module "vpc_routes" {
-     source  = "cloudopsworks/vpc-custom-routes/aws"
-     version = "1.0.0"
-
-     subnet_id = "subnet-12345678"
-     routes = [
-       {
-         cidr_block = "10.0.0.0/16"
-         nat_gateway_id = "nat-12345678"
-       }
-     ]
-   }
+1. Create and enter the deployment directory, then scaffold:
+   ```sh
+   mkdir -p prod/us-east-1/spoke001/vpc-custom-routes
+   cd prod/us-east-1/spoke001/vpc-custom-routes
+   terragrunt scaffold github.com/cloudopsworks/terraform-module-aws-vpc-custom-routes
    ```
 
-2. Initialize Terraform:
-   ```bash
-   terraform init
+2. Answer the scaffold prompts (VPC dependency path and network tier), then edit `inputs.yaml`
+   and define the routes:
+   ```yaml
+   routes:
+     - cidr_block: "10.0.0.0/8"
+       transit_gateway_id: "tgw-0123456789abcdef0"
    ```
 
-3. Apply the configuration:
-   ```bash
-   terraform apply
+3. Validate and apply:
+   ```sh
+   terragrunt plan
+   terragrunt apply
    ```
 
 
 ## Examples
 
-terraform:
-  source: "cloudopsworks/vpc-custom-routes/aws"
-  version: "1.0.0"
-  inputs:
-    subnet_id: "subnet-12345678"
-    routes:
-      - cidr_block: "10.0.0.0/16"
-        nat_gateway_id: "nat-12345678"
-      - cidr_block: "172.16.0.0/12"
-        transit_gateway_id: "tgw-12345678"
+**Route private traffic through a Transit Gateway on all private route tables** (`inputs.yaml`,
+VPC dependency enabled with `private` + `route_tables`):
 
-terragrunt:
-  terraform:
-    source: "cloudopsworks/vpc-custom-routes/aws"
+```yaml
+routes:
+  - cidr_block: "10.0.0.0/8"
+    transit_gateway_id: "tgw-0123456789abcdef0"
+  - cidr_block: "172.16.0.0/12"
+    transit_gateway_id: "tgw-0123456789abcdef0"
+```
 
-  inputs:
-    routing_table_id: "rtb-12345678"
-    routes:
-      - cidr_block: "192.168.0.0/16"
-        vpc_peering_connection_id: "pcx-12345678"
-      - cidr_block: "fd00::/8"
-        egress_only_internet_gateway_id: "eigw-12345678"
+**Target route tables by subnet lookup, mixed targets** (`inputs.yaml`, VPC dependency disabled):
+
+```yaml
+subnet_ids:
+  - "subnet-01234567890123456"
+  - "subnet-01234567890123457"
+routes:
+  - cidr_block: "192.168.0.0/16"
+    vpc_peering_connection_id: "pcx-0123456789abcdef0"
+  - cidr_block: "::/0"
+    egress_only_internet_gateway_id: "eigw-0123456789abcdef0"
+```
+
+**Plain Terraform (module registry) usage:**
+
+```hcl
+module "vpc_custom_routes" {
+  source  = "cloudopsworks/vpc-custom-routes/aws"
+  version = "~> 1.0"
+
+  org = {
+    organization_name = "example"
+    organization_unit = "devops"
+    environment_type  = "production"
+    environment_name  = "prod"
+  }
+
+  routing_table_ids = ["rtb-01234567890123456"]
+  routes = [
+    {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = "nat-0123456789abcdef0"
+    }
+  ]
+}
+```
 
 
 
@@ -151,13 +313,13 @@ Available targets:
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.4 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.35 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.4 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.35 |
 
 ## Modules
 
@@ -171,7 +333,7 @@ Available targets:
 |------|------|
 | [aws_route.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route) | resource |
 | [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
-| [aws_route_table.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/route_table) | data source |
+| [aws_route_table.from_subnets](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/route_table) | data source |
 
 ## Inputs
 
@@ -180,10 +342,10 @@ Available targets:
 | <a name="input_extra_tags"></a> [extra\_tags](#input\_extra\_tags) | Extra tags to add to the resources | `map(string)` | `{}` | no |
 | <a name="input_is_hub"></a> [is\_hub](#input\_is\_hub) | Is this a hub or spoke configuration? | `bool` | `false` | no |
 | <a name="input_org"></a> [org](#input\_org) | Organization details | <pre>object({<br/>    organization_name = string<br/>    organization_unit = string<br/>    environment_type  = string<br/>    environment_name  = string<br/>  })</pre> | n/a | yes |
-| <a name="input_routes"></a> [routes](#input\_routes) | A list of routes to be added to the routing table. | <pre>list(object({<br/>    cidr_block                      = string<br/>    nat_gateway_id                  = optional(string, null)<br/>    transit_gateway_id              = optional(string, null)<br/>    vpc_peering_connection_id       = optional(string, null)<br/>    egress_only_internet_gateway_id = optional(string, null)<br/>    network_interface_id            = optional(string, null)<br/>    vpc_endpoint_id                 = optional(string, null)<br/>  }))</pre> | `[]` | no |
-| <a name="input_routing_table_id"></a> [routing\_table\_id](#input\_routing\_table\_id) | The ID of the routing table to which the NAT gateway will be associated. Required if subnet\_id is not provided. | `string` | `""` | no |
+| <a name="input_routes"></a> [routes](#input\_routes) | (Optional) List of custom routes to add to every resolved route table. Each entry requires a destination cidr\_block and exactly one target (NAT Gateway, Transit Gateway, VPC Peering Connection, Egress-only Internet Gateway, Network Interface or VPC Endpoint). Default: [] | <pre>list(object({<br/>    cidr_block                      = string<br/>    nat_gateway_id                  = optional(string, null)<br/>    transit_gateway_id              = optional(string, null)<br/>    vpc_peering_connection_id       = optional(string, null)<br/>    egress_only_internet_gateway_id = optional(string, null)<br/>    network_interface_id            = optional(string, null)<br/>    vpc_endpoint_id                 = optional(string, null)<br/>  }))</pre> | `[]` | no |
+| <a name="input_routing_table_ids"></a> [routing\_table\_ids](#input\_routing\_table\_ids) | (Optional) List of route table IDs that will receive the custom routes directly. Required if subnet\_ids is not provided. Default: [] | `list(string)` | `[]` | no |
 | <a name="input_spoke_def"></a> [spoke\_def](#input\_spoke\_def) | Spoke ID Number, must be a 3 digit number | `string` | `"001"` | no |
-| <a name="input_subnet_id"></a> [subnet\_id](#input\_subnet\_id) | The ID of the subnet to which the NAT gateway will be associated. Required if routing\_table\_id is not provided. | `string` | `""` | no |
+| <a name="input_subnet_ids"></a> [subnet\_ids](#input\_subnet\_ids) | (Optional) List of subnet IDs whose associated route tables will receive the custom routes. The route table for each subnet is discovered automatically. Required if routing\_table\_ids is not provided. Default: [] | `list(string)` | `[]` | no |
 
 ## Outputs
 

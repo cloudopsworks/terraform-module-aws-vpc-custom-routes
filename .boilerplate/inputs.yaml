@@ -1,18 +1,27 @@
 # Module configuration
-# Required variables
-{{- range .requiredVariables }}
-{{- if ne .Name "org"}}
-# Description {{ .Description }} , Type: {{ .Type }}
-{{ .Name }}: {{ .DefaultValuePlaceholder }}
-{{- end }}
+# AWS VPC Custom Routes — per-deployment inputs loaded by terragrunt.hcl as local.local_vars.
+#
+# NOTE: When the VPC dependency is enabled at scaffold time, `subnet_ids` or
+# `routing_table_ids` are wired automatically in terragrunt.hcl from the VPC
+# dependency outputs (private/public/intra/database route tables or subnets).
+# In that case do NOT set them here — only configure `routes`.
 
-{{- end }}
-# Optional variables
-{{- range .optionalVariables }}
-{{- if ne .Name "is_hub" "spoke_def" "extra_args" }}
-# Description {{ .Description }} , Type: {{ .Type }}
-#{{ .Name }}: {{ .DefaultValue }}
-{{- end }}
+# subnet_ids: # (Optional) List of subnet IDs whose associated route tables will receive the custom routes.
+#             # The route table for each subnet is discovered automatically.
+#             # Required if routing_table_ids is not provided. Default: []
+#   - "subnet-01234567890123456"
 
-{{- end }}
+# routing_table_ids: # (Optional) List of route table IDs that will receive the custom routes directly.
+#                    # Required if subnet_ids is not provided. Default: []
+#   - "rtb-01234567890123456"
 
+# routes: (Optional) List of custom routes added to EVERY resolved route table. Default: []
+# Each entry requires a destination cidr_block and exactly one target attribute.
+routes: []
+#   - cidr_block: "10.100.0.0/16"                              # (Required) Destination IPv4 or IPv6 CIDR block for the route.
+#     nat_gateway_id: "nat-0123456789abcdef0"                  # (Optional) NAT Gateway ID target. Default: null
+#     transit_gateway_id: "tgw-0123456789abcdef0"              # (Optional) Transit Gateway ID target. Default: null
+#     vpc_peering_connection_id: "pcx-0123456789abcdef0"       # (Optional) VPC Peering Connection ID target. Default: null
+#     egress_only_internet_gateway_id: "eigw-0123456789abcdef0" # (Optional) Egress-only Internet Gateway ID target, IPv6 destinations only. Default: null
+#     network_interface_id: "eni-0123456789abcdef0"            # (Optional) Network Interface (ENI) ID target. Default: null
+#     vpc_endpoint_id: "vpce-0123456789abcdef0"                # (Optional) Gateway Load Balancer VPC Endpoint ID target. Default: null
