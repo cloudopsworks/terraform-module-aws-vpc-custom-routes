@@ -43,34 +43,14 @@ data "aws_route_table" "from_subnets" {
   subnet_id = each.value
 }
 
-output "route_mappings_by_subnet" {
-  value = local.route_mappings_by_subnet
+resource "aws_route" "this" {
+  for_each                  = length(local.route_mappings_by_subnet) > 0 ? local.route_mappings_by_subnet : local.route_mappings_by_route_table
+  route_table_id            = each.value.route_table_id
+  destination_cidr_block    = each.value.cidr_block
+  nat_gateway_id            = each.value.nat_gateway_id
+  transit_gateway_id        = each.value.transit_gateway_id
+  vpc_peering_connection_id = each.value.vpc_peering_connection_id
+  egress_only_gateway_id    = each.value.egress_only_internet_gateway_id
+  network_interface_id      = each.value.network_interface_id
+  vpc_endpoint_id           = each.value.vpc_endpoint_id
 }
-
-output "route_mappings_by_route_table" {
-  value = local.route_mappings_by_route_table
-}
-
-output "route_table_ids" {
-  value = var.routing_table_ids
-}
-
-output "subnet_ids" {
-  value = var.subnet_ids
-}
-
-output "routes" {
-  value = var.routes
-}
-
-# resource "aws_route" "this" {
-#   for_each                  = length(local.route_mappings_by_subnet) > 0 ? local.route_mappings_by_subnet : local.route_mappings_by_route_table
-#   route_table_id            = each.value.route_table_id
-#   destination_cidr_block    = each.value.cidr_block
-#   nat_gateway_id            = each.value.nat_gateway_id
-#   transit_gateway_id        = each.value.transit_gateway_id
-#   vpc_peering_connection_id = each.value.vpc_peering_connection_id
-#   egress_only_gateway_id    = each.value.egress_only_internet_gateway_id
-#   network_interface_id      = each.value.network_interface_id
-#   vpc_endpoint_id           = each.value.vpc_endpoint_id
-# }
