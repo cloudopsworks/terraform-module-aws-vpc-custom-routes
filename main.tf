@@ -10,7 +10,7 @@
 locals {
   route_mappings_by_subnet = [
     for sub in var.subnet_ids : {
-      for routes in var.routes : "${sub}_${routes.cidr_block}" => {
+      for routes in var.routes : "${data.aws_route_table.from_subnets[sub].route_table_id}_${routes.cidr_block}" => {
         route_table_id            = data.aws_route_table.from_subnets[sub].route_table_id
         destination_cidr_block    = routes.cidr_block
         nat_gateway_id            = routes.nat_gateway_id
