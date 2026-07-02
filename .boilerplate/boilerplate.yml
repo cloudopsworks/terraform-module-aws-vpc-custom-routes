@@ -54,7 +54,7 @@ variables:
     default: route_tables
     options:
       - route_tables
-      - subnet
+      - subnets
     confirm: true
 
 hooks:
