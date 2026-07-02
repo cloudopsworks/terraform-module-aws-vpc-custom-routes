@@ -51,6 +51,18 @@ output "route_mappings_by_route_table" {
   value = local.route_mappings_by_route_table
 }
 
+output "route_table_ids" {
+  value = var.routing_table_ids
+}
+
+output "subnet_ids" {
+  value = var.subnet_ids
+}
+
+output "routes" {
+  value = var.routes
+}
+
 # resource "aws_route" "this" {
 #   for_each                  = length(local.route_mappings_by_subnet) > 0 ? local.route_mappings_by_subnet : local.route_mappings_by_route_table
 #   route_table_id            = each.value.route_table_id
