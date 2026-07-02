@@ -54,7 +54,7 @@ resource "aws_route" "this" {
   nat_gateway_id            = each.value.nat_gateway_id
   transit_gateway_id        = each.value.transit_gateway_id
   vpc_peering_connection_id = each.value.vpc_peering_connection_id
-  egress_only_gateway_id    = each.value.egress_only_internet_gateway_id
+  egress_only_gateway_id    = each.value.egress_only_gateway_id
   network_interface_id      = each.value.network_interface_id
   vpc_endpoint_id           = each.value.vpc_endpoint_id
 }
