@@ -24,8 +24,8 @@ locals {
   ]
   route_mappings_by_route_table = [
     for rt in var.routing_table_ids : {
-      for routes in var.routes : "${data.aws_route_table.from_route_tables[rt].subnet_id}_${routes.cidr_block}" => {
-        route_table_id            = data.aws_route_table.from_route_tables[rt].route_table_id
+      for routes in var.routes : "${rt}_${routes.cidr_block}" => {
+        route_table_id            = rt
         destination_cidr_block    = routes.cidr_block
         nat_gateway_id            = routes.nat_gateway_id
         transit_gateway_id        = routes.transit_gateway_id
@@ -41,11 +41,6 @@ locals {
 data "aws_route_table" "from_subnets" {
   for_each  = toset(var.subnet_ids)
   subnet_id = each.value
-}
-
-data "aws_route_table" "from_route_tables" {
-  for_each       = toset(var.routing_table_ids)
-  route_table_id = each.value
 }
 
 resource "aws_route" "this" {
