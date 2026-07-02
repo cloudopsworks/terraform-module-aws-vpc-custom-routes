@@ -22,6 +22,40 @@ variables:
     default: {}
     confirm: true
   # End - Generic Boilerplate Variables Setup
+  - name: vpc_dependency_enabled
+    order: 2
+    description: "VPC Dependency Enabled"
+    type: bool
+    default: true
+    confirm: true
+  - name: vpc_dependency_path
+    order: 3
+    description: "VPC Dependency Path"
+    type: string
+    default: "../vpc"
+    confirm: true
+  - name: vpc_dependency_network_type
+    order: 4
+    description: "VPC Dependency Network Type, e.g. private, public, database, intra, both(intra+private), three(intra+private+database)"
+    type: enum
+    default: private
+    options:
+      - private
+      - public
+      - database
+      - intra
+      - both
+      - three
+    confirm: true
+  - name: vpc_dependency_route_tables_from
+    order: 5
+    description: "VPC Dependency Route Table From, route_tables or subnet"
+    type: enum
+    default: route_tables
+    options:
+      - route_tables
+      - subnet
+    confirm: true
 
 hooks:
   after:
