@@ -8,8 +8,8 @@
 #
 
 locals {
-  route_mappings_by_subnet = merge([
-    for routes in var.routes : [
+  route_mappings_by_subnet = [
+    for routes in var.routes : {
       for sub in var.subnet_ids : "${sub}_${routes.cidr_block}" => {
         route_table_id            = data.aws_route_table.from_subnets[sub].route_table_id
         destination_cidr_block    = routes.cidr_block
@@ -20,10 +20,10 @@ locals {
         network_interface_id      = routes.network_interface_id
         vpc_endpoint_id           = routes.vpc_endpoint_id
       }
-    ]
-  ])
-  route_mappings_by_route_table = merge([
-    for routes in var.routes : [
+    }
+  ]
+  route_mappings_by_route_table = [
+    for routes in var.routes : {
       for rt in var.routing_table_ids : "${data.aws_route_table.from_route_tables[rt].subnet_id}_${routes.cidr_block}" => {
         route_table_id            = data.aws_route_table.from_route_tables[rt].route_table_id
         destination_cidr_block    = routes.cidr_block
@@ -34,8 +34,8 @@ locals {
         network_interface_id      = routes.network_interface_id
         vpc_endpoint_id           = routes.vpc_endpoint_id
       }
-    ]
-  ])
+    }
+  ]
   route_mappings = merge(local.route_mappings_by_subnet, local.route_mappings_by_route_table)
 }
 
