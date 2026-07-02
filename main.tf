@@ -10,8 +10,8 @@
 locals {
   route_mappings_by_subnet = merge([
     for routes in var.routes : {
-      for rt in data.aws_route_table.from_subnets : "${rt.subnet_id}_${routes.cidr_block}" => {
-        route_table_id            = rt.id
+      for sub in var.subnet_ids : "${sub}_${routes.cidr_block}" => {
+        route_table_id            = data.aws_route_table.from_subnets[sub].route_table_id
         destination_cidr_block    = routes.cidr_block
         nat_gateway_id            = routes.nat_gateway_id
         transit_gateway_id        = routes.transit_gateway_id
@@ -24,8 +24,8 @@ locals {
   ])
   route_mappings_by_route_table = merge([
     for routes in var.routes : {
-      for rt in data.aws_route_table.from_route_tables : "${rt.subnet_id}_${routes.cidr_block}" => {
-        route_table_id            = rt.id
+      for rt in var.routing_table_ids : "${data.aws_route_table.from_route_tables[rt].subnet_id}_${routes.cidr_block}" => {
+        route_table_id            = data.aws_route_table.from_route_tables[rt].route_table_id
         destination_cidr_block    = routes.cidr_block
         nat_gateway_id            = routes.nat_gateway_id
         transit_gateway_id        = routes.transit_gateway_id
